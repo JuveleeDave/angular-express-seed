@@ -1,22 +1,114 @@
 import { Injectable } from '@angular/core';
 import { Headers, Http } from '@angular/http';
 import { Router, RouterModule, Routes } from '@angular/router';
-import 'rxjs/add/operator/map';
 import { Response } from '@angular/http/src/static_response';
 import { Observable } from 'rxjs/Observable';
+import 'rxjs/add/operator/map';
+
+import UserDataModel from '../DataModels/UserDataModel';
 
 @Injectable()
 export class DataService {
 
-    private headers = new Headers({ 'Content-Type': 'application/json' });
-    private localUrl = 'http://localhost:3000/api/';
+  private headers = new Headers({'Content-Type': 'application/json'});
+  private localUrl = 'http://localhost:3000/';
+  private liveUrl = 'https://antique-adventures-v2.herokuapp.com/';
+  User: UserDataModel;
+  selectedItemId: String = '';
+  itemImageUrl: String = '';
 
-    constructor(private http: Http) { }
+  constructor(private http: Http) {
+    this.User = new UserDataModel();
+  }
 
-    // Get all posts from the API
-    getAllPosts() {
-        return this.http
-            .get(this.localUrl + 'posts', { headers: this.headers })
-            .map(res => res.json());
+  //
+  // ─── USER REQUESTS ──────────────────────────────────────────────────────────────
+  //
+    /**
+    * HANDLES REGISTERING A NEW USER
+    * @param this.User
+    */
+    registerUser() {
+      return this.http
+      .post(this.localUrl + 'registerUser', { data: this.User }, { headers: this.headers })
+      .map(res => res.json());
     }
+
+    /**
+    * HANDLES LOGIN FOR A USER
+    * @param this.User
+    */
+    loginUser() {
+      return this.http
+      .post(this.localUrl + 'login', { data: this.User }, { headers: this.headers })
+      .map(res => res.json());
+    }
+
+    getUserProfile() {
+      const userId = this.getUserId();
+      const dataObj = {
+        user: userId
+      };
+      return this.http
+        .post(this.localUrl + 'getProfile', {data: dataObj}, { headers: this.headers })
+        .map(res => res.json());
+    }
+  //
+  // ──────────────────────────────────────────────────────────── USER REQUESTS ─────
+  //
+
+  //
+  // ─── ANTIQUE REQUESTS ───────────────────────────────────────────────────────────
+  //
+    getAllAntiques() {
+      return this.http
+        .post(this.localUrl + 'getAllAntiques', { headers: this.headers })
+        .map(res => res.json());
+    }
+
+    getAntique(antiqueId) {
+      const dataObj = {
+      };
+      return this.http
+        .post(this.localUrl + 'getAntique', { data: dataObj }, { headers: this.headers })
+        .map(res => res.json());
+    }
+
+    saveAntique(itemValObj) {
+      const userId = this.getUserId();
+      const dataObj = {
+        user: userId
+      };
+      return this.http
+        .post(this.localUrl + 'saveNewAntique', { data: dataObj }, { headers: this.headers })
+        .map(res => res.json());
+    }
+
+  editAntique(itemValObj) {
+      const dataObj = {
+      };
+      return this.http
+        .post(this.localUrl + 'editAntique/' + this.selectedItemId, { data: dataObj }, { headers: this.headers })
+        .map(res => res.json());
+    }
+
+    deleteAntique(antiqueId) {
+      const userId = this.getUserId();
+      const dataObj = {
+        user: userId,
+        antique: antiqueId
+      };
+      // console.log(dataObj);
+      return this.http
+        .post(this.localUrl + 'deleteAntique', { data: dataObj }, { headers: this.headers })
+        .map(res => res.json());
+    }
+  //
+  // ───────────────────────────────────────────────────────── ANTIQUE REQUESTS ─────
+  //
+
+  public getUserId() {
+    const userId = localStorage.getItem('id');
+    return userId;
+  }
 }
