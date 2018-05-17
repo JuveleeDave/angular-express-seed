@@ -12,7 +12,7 @@ import { Angular2Csv } from 'angular2-csv/Angular2-csv';
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
-  styleUrls: ['./home.component.css']
+  styleUrls: ['./home.component.scss']
 })
 
 export class HomeComponent implements OnInit {
