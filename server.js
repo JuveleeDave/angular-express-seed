@@ -23,17 +23,19 @@ const async = require("async");
 // Makes Express avaliable
 const app = express();
 // Get our API routes
-const api = require('./server/serverRoutes/api');
+const api = require('./server/routes/api');
 // Requirements
 require('dotenv').config()
 // Setting default server settings
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({
+  extended: false
+}));
 app.use(function (req, res, next) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, PATCH, DELETE, OPTIONS');
-    next();
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, PATCH, DELETE, OPTIONS');
+  next();
 });
 app.use(express.static(path.join(__dirname, 'dist'))); // Point static path to dist
 // app.use('/api', api); // Set our api routes - if i want to use an api for a bigger project
@@ -41,27 +43,27 @@ app.use(express.static(path.join(__dirname, 'dist'))); // Point static path to d
 // Connect to DB with mongoose
 mongoose.Promise = global.Promise;
 // Local DB
-// mongoose.connect("mongodb://localhost:27017/antiqueAdventuresDB", function (err) {
-//     if (err) {
-//         console.log("Error: " + err);
-//     } else {
-//         console.log("Connected to Database")
-//     }
-// });
-// Live DB
-mongoose.connect(process.env.DB_CONNECT, function (err) {
+mongoose.connect("mongodb://localhost:27017/seed-db", function (err) {
     if (err) {
         console.log("Error: " + err);
     } else {
         console.log("Connected to Database")
     }
 });
+// Live DB
+// mongoose.connect(process.env.DB_CONNECT, function (err) {
+//   if (err) {
+//     console.log("Error: " + err);
+//   } else {
+//     console.log("Connected to Database")
+//   }
+// });
 
 // Catch all other routes and return the index file
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist/index.html'));
+  res.sendFile(path.join(__dirname, 'dist/index.html'));
 });
-    
+
 //
 // ──────────────────────────────────────────────────────── DOWNLOAD DATABASE ─────
 //
@@ -74,7 +76,7 @@ app.get('*', (req, res) => {
 //
 // ─── MODELS ─────────────────────────────────────────────────────────────────────
 //
-const User = require('./server/serverModels/userModel');
+const User = require('./server/models/userModel');
 //
 // ─────────────────────────────────────────────────────────────────── MODELS ─────
 //
@@ -88,27 +90,31 @@ const User = require('./server/serverModels/userModel');
  * @param {*} next
  */
 app.post('/registerUser', function (req, res, next) {
-    var data = req.body.data;
-    var user = new User({
-        name: data.name,
-        email: data.email,
-        password: bcrypt.hashSync(data.password, 10)
+  var data = req.body.data;
+  var user = new User({
+    name: data.name,
+    email: data.email,
+    password: bcrypt.hashSync(data.password, 10)
+  });
+  user.save(function (err, result) {
+    if (err) {
+      return res.status(500).json({
+        title: 'An error occurred with sign up',
+        error: err
+      });
+    }
+    var token = jwt.sign({
+      user: user
+    }, 'secret', {
+      expiresIn: 7200
     });
-    user.save(function (err, result) {
-        if (err) {
-            return res.status(500).json({
-                title: 'An error occurred with sign up',
-                error: err
-            });
-        }
-        var token = jwt.sign({ user: user }, 'secret', { expiresIn: 7200 });
-        res.status(201).json({
-            message: 'User created',
-            success: true,
-            token: token,
-            obj: result
-        });
+    res.status(201).json({
+      message: 'User created',
+      success: true,
+      token: token,
+      obj: result
     });
+  });
 });
 
 /**
@@ -118,37 +124,47 @@ app.post('/registerUser', function (req, res, next) {
  * @param {*} next
  */
 app.post('/login', function (req, res, next) {
-    var data = req.body.data;
-    User.findOne({ email: data.email }, function (err, user) {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                title: 'An error occurred',
-                error: err
-            });
+  var data = req.body.data;
+  User.findOne({
+    email: data.email
+  }, function (err, user) {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        title: 'An error occurred',
+        error: err
+      });
+    }
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        title: 'Login failed',
+        error: {
+          message: 'Invalid login credentials'
         }
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                title: 'Login failed',
-                error: { message: 'Invalid login credentials' }
-            });
+      });
+    }
+    if (!bcrypt.compareSync(data.password, user.password)) {
+      return res.status(401).json({
+        success: false,
+        title: 'Login failed',
+        error: {
+          message: 'Invalid login credentials'
         }
-        if (!bcrypt.compareSync(data.password, user.password)) {
-            return res.status(401).json({
-                success: false,
-                title: 'Login failed',
-                error: { message: 'Invalid login credentials' }
-            });
-        }
-        var token = jwt.sign({ user: user }, 'secret', { expiresIn: 7200 });
-        res.status(200).json({
-            message: 'Successfully logged in',
-            success: true,
-            token: token,
-            obj: user
-        });
+      });
+    }
+    var token = jwt.sign({
+      user: user
+    }, 'secret', {
+      expiresIn: 7200
     });
+    res.status(200).json({
+      message: 'Successfully logged in',
+      success: true,
+      token: token,
+      obj: user
+    });
+  });
 });
 
 //
@@ -164,16 +180,22 @@ app.post('/login', function (req, res, next) {
  * @param {*} res
  */
 app.post("/getAllAntiques", function (req, res) {
-    Antique.find({})
-        .exec(function (err, antiques) {
-            if (err) {
-                console.log("Error: " + " " + err);
-                res.send({success: false, message: err});
-            } else {
-                // console.log(antiques);
-                res.send({ success: true, data: antiques})
-            }
+  Antique.find({})
+    .exec(function (err, antiques) {
+      if (err) {
+        console.log("Error: " + " " + err);
+        res.send({
+          success: false,
+          message: err
+        });
+      } else {
+        // console.log(antiques);
+        res.send({
+          success: true,
+          data: antiques
         })
+      }
+    })
 });
 
 /**
@@ -182,17 +204,25 @@ app.post("/getAllAntiques", function (req, res) {
  * @param {*} res
  * @param {*} next
  */
-app.post("/getAntique", function(req, res, next){
-    Antique.findById({ _id: req.body.data.antique})
-        .exec(function (err, antique) {
-            if (err) {
-                console.log("Error: " + " " + err);
-                res.send({ success: false, message: err });
-            } else {
-                // console.log(antique);
-                res.send({ success: true, data: antique })
-            }
+app.post("/getAntique", function (req, res, next) {
+  Antique.findById({
+      _id: req.body.data.antique
+    })
+    .exec(function (err, antique) {
+      if (err) {
+        console.log("Error: " + " " + err);
+        res.send({
+          success: false,
+          message: err
+        });
+      } else {
+        // console.log(antique);
+        res.send({
+          success: true,
+          data: antique
         })
+      }
+    })
 });
 
 /**
@@ -202,39 +232,39 @@ app.post("/getAntique", function(req, res, next){
  * @param {*} next
  */
 app.post("/saveNewAntique", function (req, res, next) {
-    const data = req.body.data;
-    const newAntique = new Antique({
-        name: data.antique.name,
-        artist: data.antique.artist,
-        year: data.antique.year,
-        category: data.antique.category.category,
-        subCategory: data.antique.subCategory,
-        signed: data.antique.signed,
-        boughtPrice: data.antique.boughtPrice,
-        soldPrice: data.antique.soldPrice,
-        value: data.antiqueValue,
-        image: data.antique.image,
-        description: data.antique.description,
-        condition: data.antique.condition,
-        width: data.antique.width,
-        height: data.antique.height,
-        depth: data.antique.depth,
-        material: data.antique.material,
-        location: data.antique.location,
-        provenance: data.antique.provenance,
-        provenanceImage: data.antique.provenanceImage,
-        status: data.antique.status,
+  const data = req.body.data;
+  const newAntique = new Antique({
+    name: data.antique.name,
+    artist: data.antique.artist,
+    year: data.antique.year,
+    category: data.antique.category.category,
+    subCategory: data.antique.subCategory,
+    signed: data.antique.signed,
+    boughtPrice: data.antique.boughtPrice,
+    soldPrice: data.antique.soldPrice,
+    value: data.antiqueValue,
+    image: data.antique.image,
+    description: data.antique.description,
+    condition: data.antique.condition,
+    width: data.antique.width,
+    height: data.antique.height,
+    depth: data.antique.depth,
+    material: data.antique.material,
+    location: data.antique.location,
+    provenance: data.antique.provenance,
+    provenanceImage: data.antique.provenanceImage,
+    status: data.antique.status,
+  });
+  newAntique.save(function (err, antique) {
+    if (err) {
+      return next(err);
+      res.send(err);
+    }
+    res.send({
+      success: true,
+      message: 'antique saved'
     });
-    newAntique.save(function (err, antique) {
-        if (err) {
-            return next(err);
-            res.send(err);
-        }
-        res.send({
-            success: true,
-            message: 'antique saved'
-        });
-    });
+  });
 });
 
 /**
@@ -243,36 +273,42 @@ app.post("/saveNewAntique", function (req, res, next) {
  * @param {*} res
  * @param {*} next
  */
-app.post("/editAntique/:_id", function(req,res, next){
-    var updatedAntique = req.body.data.antique;
-    var updatedValue = req.body.data.antiqueValue
-    async.parallel(
-        {
-            updateAntique: function (callback) {
-                Antique.findByIdAndUpdate(req.params._id, {
-                    updatedAntique
-                }).exec(function (err, serverUpdatedAntique) {
-                    callback(err, serverUpdatedAntique);
-                });
-            },
-            updateAntiqueValue: function (callback) {
-                Antique.findByIdAndUpdate(
-                    req.params._id,
-                    { $push: { value: updatedValue } },
-                    { new: true }
-                ).exec(function (err, finalUpdatedAntique) {
-                    callback(err, finalUpdatedAntique);
-                });
+app.post("/editAntique/:_id", function (req, res, next) {
+  var updatedAntique = req.body.data.antique;
+  var updatedValue = req.body.data.antiqueValue
+  async.parallel({
+      updateAntique: function (callback) {
+        Antique.findByIdAndUpdate(req.params._id, {
+          updatedAntique
+        }).exec(function (err, serverUpdatedAntique) {
+          callback(err, serverUpdatedAntique);
+        });
+      },
+      updateAntiqueValue: function (callback) {
+        Antique.findByIdAndUpdate(
+          req.params._id, {
+            $push: {
+              value: updatedValue
             }
-        },
-        function (err, antique) {
-            if (err) {
-                next(err);
-                return;
-            }
-            res.send({ success: true, antique: antique });
-        }
-    )
+          }, {
+            new: true
+          }
+        ).exec(function (err, finalUpdatedAntique) {
+          callback(err, finalUpdatedAntique);
+        });
+      }
+    },
+    function (err, antique) {
+      if (err) {
+        next(err);
+        return;
+      }
+      res.send({
+        success: true,
+        antique: antique
+      });
+    }
+  )
 });
 
 /**
@@ -282,33 +318,39 @@ app.post("/editAntique/:_id", function(req,res, next){
  * @param {*} next
  */
 app.post("/deleteAntique", function (req, res, next) {
-    var routeId = req.body.data.route;
-    var userId = req.body.data.user;
-    async.parallel(
-        {
-            updateRoute: function (callback) {
-                Route.findByIdAndRemove(routeId).exec(function (err, updatedRoute) {
-                    callback(err, updatedRoute);
-                });
-            },
-            updatedUser: function (callback) {
-                User.findByIdAndUpdate(
-                    userId,
-                    { $pull: { savedRoutes: routeId } },
-                    { new: true }
-                ).exec(function (err, updatedUser) {
-                    callback(err, updatedUser);
-                });
+  var routeId = req.body.data.route;
+  var userId = req.body.data.user;
+  async.parallel({
+      updateRoute: function (callback) {
+        Route.findByIdAndRemove(routeId).exec(function (err, updatedRoute) {
+          callback(err, updatedRoute);
+        });
+      },
+      updatedUser: function (callback) {
+        User.findByIdAndUpdate(
+          userId, {
+            $pull: {
+              savedRoutes: routeId
             }
-        },
-        function (err, results) {
-            if (err) {
-                next(err);
-                return;
-            }
-            res.send({ success: true, user: results.updatedUser });
-        }
-    );
+          }, {
+            new: true
+          }
+        ).exec(function (err, updatedUser) {
+          callback(err, updatedUser);
+        });
+      }
+    },
+    function (err, results) {
+      if (err) {
+        next(err);
+        return;
+      }
+      res.send({
+        success: true,
+        user: results.updatedUser
+      });
+    }
+  );
 });
 
 //
